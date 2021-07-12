@@ -1,0 +1,36 @@
+[package]
+name = "tracing-fluentd"
+version = "0.1.0"
+authors = ["Douman <douman@gmx.se>"]
+edition = "2018"
+description = "Subscriber for fluentd"
+license = "BSL-1.0"
+repository = "https://github.com/DoumanAsh/tracing-fluentd"
+keywords = ["tracing", "fluentd"]
+readme = "README.md"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+
+[dependencies.serde]
+version = "1"
+default-features = false
+features = ["alloc"]
+
+[dependencies.indexmap]
+version = "1.7"
+features = ["serde"]
+
+[dependencies.xxhash-rust]
+version = "0.8.2"
+features = ["xxh3"]
+
+[dependencies.tracing-subscriber]
+version = "0.2"
+default-features = false
+features = ["registry"]
+
+[dependencies]
+tracing-core = "0.1"
