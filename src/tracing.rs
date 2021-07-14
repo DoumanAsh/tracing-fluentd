@@ -1,10 +1,13 @@
-use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::registry::{LookupSpan, SpanRef};
 use tracing_core::subscriber::Subscriber as Collect;
 use tracing_subscriber::layer::Context;
 use tracing_core::span::{Id, Attributes, Record};
-use tracing_core::{Event, Metadata};
+use tracing_core::{Event, Metadata, Field};
 
-use super::{Subscriber, MakeWriter};
+use super::{Subscriber, MakeWriter, FlattenFmt, NestedFmt};
+use crate::fluent;
+
+use core::fmt;
 
 macro_rules! get_span {
     ($ctx:ident[$id:ident]) => {
@@ -15,31 +18,160 @@ macro_rules! get_span {
     }
 }
 
-impl<A: MakeWriter + 'static, C: Collect + for<'a> LookupSpan<'a>> tracing_subscriber::layer::Layer<C> for Subscriber<A> {
-    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
+///Describes how compose event fields.
+pub trait FieldFormatter: 'static {
+    #[inline(always)]
+    fn new_span<C: Collect + for<'a> LookupSpan<'a>>(attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
+        let span = get_span!(ctx[id]);
+
+        if span.extensions().get::<fluent::Map>().is_none() {
+            let mut record = fluent::Map::new();
+            attrs.record(&mut record);
+
+            span.extensions_mut().insert(record);
+        }
+    }
+
+    #[inline(always)]
+    fn on_record<C: Collect + for<'a> LookupSpan<'a>>(id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
         let span = get_span!(ctx[id]);
 
         let mut extensions = span.extensions_mut();
+        if let Some(record) = extensions.get_mut::<fluent::Map>() {
+            values.record(record);
+        }
     }
 
-    fn on_record(&self, id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
-        let span = get_span!(ctx[id]);
-    }
+    fn on_event<'a, R: LookupSpan<'a>>(record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>);
+}
 
-    fn on_enter(&self, id: &Id, ctx: Context<'_, C>) {
-    }
+impl FieldFormatter for NestedFmt {
+    #[inline(always)]
+    fn on_event<'a, R: LookupSpan<'a>>(event_record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>) {
+        use core::ops::DerefMut;
 
-    fn on_exit(&self, id: &Id, ctx: Context<'_, C>) {
-    }
+        event.record(event_record.deref_mut());
+        let mut metadata = fluent::Map::new();
 
-    fn on_close(&self, id: Id, ctx: Context<'_, C>) {
-    }
+        if let Some(name) = event.metadata().file() {
+            metadata.insert("file".to_owned(), name.to_owned().into());
+        }
+        if let Some(line) = event.metadata().line() {
+            metadata.insert("line".to_owned(), line.into());
+        }
+        metadata.insert("module".to_owned(), event.metadata().target().to_owned().into());
 
-    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, C>) {
+        event_record.insert("metadata".to_owned(), metadata.into());
+
+        if let Some(span) = current_span {
+            let extensions = span.extensions();
+            if let Some(record) = extensions.get::<fluent::Map>() {
+                event_record.insert(span.name().to_owned(), record.clone().into());
+            }
+            while let Some(span) = span.parent() {
+                if let Some(record) = extensions.get::<fluent::Map>() {
+                    event_record.insert(span.name().to_owned(), record.clone().into());
+                }
+            }
+        }
     }
 }
 
-impl<A: MakeWriter + 'static> tracing_core::subscriber::Subscriber for Subscriber<A> {
+impl FieldFormatter for FlattenFmt {
+    #[inline(always)]
+    fn on_event<'a, R: LookupSpan<'a>>(event_record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>) {
+        use core::ops::DerefMut;
+
+        event.record(event_record.deref_mut());
+        if let Some(name) = event.metadata().file() {
+            event_record.insert("file".to_owned(), name.to_owned().into());
+        }
+        if let Some(line) = event.metadata().line() {
+            event_record.insert("line".to_owned(), line.into());
+        }
+        event_record.insert("module".to_owned(), event.metadata().target().to_owned().into());
+
+        if let Some(span) = current_span {
+            let extensions = span.extensions();
+            if let Some(record) = extensions.get::<fluent::Map>() {
+                event_record.update(record);
+            }
+            while let Some(span) = span.parent() {
+                let extensions = span.extensions();
+                if let Some(record) = extensions.get::<fluent::Map>() {
+                    event_record.update(record)
+                }
+            }
+        }
+    }
+}
+
+impl tracing_core::field::Visit for fluent::Map {
+    #[inline(always)]
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        let value = format!("{:?}", value);
+        self.insert(field.name().to_owned(), value.into());
+    }
+
+    #[inline(always)]
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.insert(field.name().to_owned(), value.into());
+    }
+
+    #[inline(always)]
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.insert(field.name().to_owned(), value.into());
+    }
+
+    #[inline(always)]
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.insert(field.name().to_owned(), value.into());
+    }
+
+    #[inline(always)]
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.insert(field.name().to_owned(), value.to_owned().into());
+    }
+
+    #[inline(always)]
+    fn record_error(&mut self, field: &Field, value: &(dyn std::error::Error + 'static)) {
+        let value = format!("{}", value);
+        self.insert(field.name().to_owned(), value.into());
+    }
+}
+
+impl<F: FieldFormatter, A: MakeWriter + 'static, C: Collect + for<'a> LookupSpan<'a>> tracing_subscriber::layer::Layer<C> for Subscriber<F, A> {
+    #[inline(always)]
+    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
+        F::new_span(attrs, id, ctx);
+    }
+
+    #[inline(always)]
+    fn on_record(&self, id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
+        F::on_record(id, values, ctx);
+    }
+
+    #[inline(always)]
+    fn on_enter(&self, _id: &Id, _ctx: Context<'_, C>) {
+    }
+
+    #[inline(always)]
+    fn on_exit(&self, _id: &Id, _ctx: Context<'_, C>) {
+    }
+
+    #[inline(always)]
+    fn on_close(&self, _id: Id, _ctx: Context<'_, C>) {
+    }
+
+    #[inline]
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, C>) {
+        let mut event_record = fluent::Record::now();
+
+        F::on_event(&mut event_record, event, ctx.event_span(event));
+    }
+}
+
+impl<F: FieldFormatter, A: MakeWriter + 'static> tracing_core::subscriber::Subscriber for Subscriber<F, A> {
     fn enabled(&self, _: &Metadata<'_>) -> bool {
         true
     }
@@ -70,23 +202,23 @@ impl<A: MakeWriter + 'static> tracing_core::subscriber::Subscriber for Subscribe
         }
     }
 
-    fn record(&self, span: &Id, values: &Record<'_>) {
+    fn record(&self, _span: &Id, _values: &Record<'_>) {
         todo!();
     }
 
-    fn record_follows_from(&self, span: &Id, follows: &Id) {
+    fn record_follows_from(&self, _span: &Id, _follows: &Id) {
         todo!();
     }
 
-    fn event(&self, event: &Event<'_>) {
+    fn event(&self, _event: &Event<'_>) {
         todo!();
     }
 
-    fn enter(&self, span: &Id) {
+    fn enter(&self, _span: &Id) {
         todo!();
     }
 
-    fn exit(&self, span: &Id) {
+    fn exit(&self, _span: &Id) {
         todo!();
     }
 }

@@ -34,3 +34,11 @@ features = ["registry"]
 
 [dependencies]
 tracing-core = "0.1"
+
+[dev-dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.2"
+default-features = false
+features = ["registry", "fmt"]

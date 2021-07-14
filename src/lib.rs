@@ -6,9 +6,25 @@
 
 use std::net::{TcpStream, SocketAddrV4, SocketAddr, Ipv4Addr};
 use std::io::Write;
+use core::marker::PhantomData;
 
 mod tracing;
 mod fluent;
+
+///Describers how to format event data
+pub trait FieldFormatter: tracing::FieldFormatter {
+}
+
+///Policy to insert span data as object.
+pub struct NestedFmt;
+///Policy to insert span data as flattent object.
+pub struct FlattenFmt;
+
+impl FieldFormatter for NestedFmt {
+}
+
+impl FieldFormatter for FlattenFmt {
+}
 
 ///Describers creation of sink for `tracing` record.
 pub trait MakeWriter {
@@ -40,9 +56,10 @@ fn default() -> std::io::Result<TcpStream> {
 ///## Type params
 ///
 ///`A` - function that returns `Fluentd` addr. Default value is to return `127.0.0.1:24224`
-pub struct Subscriber<A=fn() -> std::io::Result<TcpStream>> {
+pub struct Subscriber<F=NestedFmt, A=fn() -> std::io::Result<TcpStream>> {
     tag: &'static str,
     writer: A,
+    _fmt: PhantomData<F>
 }
 
 impl Subscriber {
@@ -56,16 +73,31 @@ impl Subscriber {
         Self {
             tag,
             writer: default,
+            _fmt: PhantomData,
         }
     }
 }
 
-impl<A: MakeWriter> Subscriber<A> {
+impl<A: MakeWriter> Subscriber<NestedFmt, A> {
+    #[inline(always)]
     ///Provides callback to get `fluentd` server address.
-    pub fn with_addr<MW: MakeWriter>(self, writer: MW) -> Subscriber<MW> {
+    pub fn flatten(self) -> Subscriber<FlattenFmt, A> {
         Subscriber {
             tag: self.tag,
-            writer
+            writer: self.writer,
+            _fmt: PhantomData,
+        }
+    }
+}
+
+impl<F: FieldFormatter, A: MakeWriter> Subscriber<F, A> {
+    #[inline(always)]
+    ///Provides callback to get `fluentd` server address.
+    pub fn with_addr<MW: MakeWriter>(self, writer: MW) -> Subscriber<F, MW> {
+        Subscriber {
+            tag: self.tag,
+            writer,
+            _fmt: PhantomData,
         }
     }
 }
