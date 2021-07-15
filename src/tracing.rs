@@ -20,6 +20,9 @@ macro_rules! get_span {
 ///Describes how compose event fields.
 pub trait FieldFormatter: 'static {
     #[inline(always)]
+    ///Handler for when `Layer::new_span` is invoked.
+    ///
+    ///By default uses span's extensions to store `fluent::Map` containing attributes of the span.
     fn new_span<C: Collect + for<'a> LookupSpan<'a>>(attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
         let span = get_span!(ctx[id]);
 
@@ -32,6 +35,10 @@ pub trait FieldFormatter: 'static {
     }
 
     #[inline(always)]
+    ///Handler for when `Layer::new_span` is invoked.
+    ///
+    ///By default uses span's extensions to store extra attributes of span within `fluent::Map`,
+    ///created by  new_span, if any.
     fn on_record<C: Collect + for<'a> LookupSpan<'a>>(id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
         let span = get_span!(ctx[id]);
 
@@ -41,6 +48,10 @@ pub trait FieldFormatter: 'static {
         }
     }
 
+    ///Handler for when `Layer::on_event` is invoked.
+    ///
+    ///Given `record` must be filled with data, after exiting this method, `record` is sent to the
+    ///fluentd
     fn on_event<'a, R: LookupSpan<'a>>(record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>);
 }
 

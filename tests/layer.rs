@@ -67,3 +67,14 @@ fn should_nest_events_data() {
     drop(file);
     let _ = fs::remove_file(log_name);
 }
+//
+//#[test]
+//fn should_use_real_fluentd_server() {
+//    let layer = tracing_fluentd::Builder::new("rust").flatten().layer().expect("Create layer");
+//    let sub = Registry::default().with(layer);
+//    let guard = tracing::subscriber::set_default(sub);
+//    tracing::info!("LOLKA");
+//    test_func(3);
+//
+//    drop(guard);
+//}
