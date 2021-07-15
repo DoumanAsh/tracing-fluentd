@@ -9,7 +9,8 @@ use std::io::Write;
 use core::marker::PhantomData;
 
 mod tracing;
-mod fluent;
+pub mod fluent;
+mod worker;
 
 ///Describers how to format event data
 pub trait FieldFormatter: tracing::FieldFormatter {
@@ -27,7 +28,7 @@ impl FieldFormatter for FlattenFmt {
 }
 
 ///Describers creation of sink for `tracing` record.
-pub trait MakeWriter {
+pub trait MakeWriter: 'static + Send {
     ///Writer type
     type Writer: Write;
 
@@ -38,7 +39,7 @@ pub trait MakeWriter {
     fn make(&self) -> std::io::Result<Self::Writer>;
 }
 
-impl<W: Write, T: Fn() -> std::io::Result<W>> MakeWriter for T {
+impl<W: Write, T: 'static + Send + Fn() -> std::io::Result<W>> MakeWriter for T {
     type Writer = W;
     #[inline(always)]
     fn make(&self) -> std::io::Result<Self::Writer> {
@@ -51,18 +52,24 @@ fn default() -> std::io::Result<TcpStream> {
     TcpStream::connect(addr)
 }
 
-///Subscriber for Fluentd forward endpoint.
+///`tracing`'s Layer
+pub struct Layer<F, C> {
+    consumer: C,
+    _fmt: PhantomData<F>,
+}
+
+///Builder for Fluentd forward endpoint.
 ///
 ///## Type params
 ///
 ///`A` - function that returns `Fluentd` addr. Default value is to return `127.0.0.1:24224`
-pub struct Subscriber<F=NestedFmt, A=fn() -> std::io::Result<TcpStream>> {
+pub struct Builder<F=NestedFmt, A=fn() -> std::io::Result<TcpStream>> {
     tag: &'static str,
     writer: A,
     _fmt: PhantomData<F>
 }
 
-impl Subscriber {
+impl Builder {
     #[inline(always)]
     ///Creates default configuration.
     ///
@@ -78,11 +85,11 @@ impl Subscriber {
     }
 }
 
-impl<A: MakeWriter> Subscriber<NestedFmt, A> {
+impl<A: MakeWriter> Builder<NestedFmt, A> {
     #[inline(always)]
     ///Provides callback to get `fluentd` server address.
-    pub fn flatten(self) -> Subscriber<FlattenFmt, A> {
-        Subscriber {
+    pub fn flatten(self) -> Builder<FlattenFmt, A> {
+        Builder {
             tag: self.tag,
             writer: self.writer,
             _fmt: PhantomData,
@@ -90,14 +97,30 @@ impl<A: MakeWriter> Subscriber<NestedFmt, A> {
     }
 }
 
-impl<F: FieldFormatter, A: MakeWriter> Subscriber<F, A> {
+impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     #[inline(always)]
-    ///Provides callback to get `fluentd` server address.
-    pub fn with_addr<MW: MakeWriter>(self, writer: MW) -> Subscriber<F, MW> {
-        Subscriber {
+    ///Provides callback to get writer where to write records.
+    ///
+    ///Normally fluentd server requires to abort connection immediately
+    ///hence created writer is dropped immediately upon writing being finished.
+    pub fn with_writer<MW: MakeWriter>(self, writer: MW) -> Builder<F, MW> {
+        Builder {
             tag: self.tag,
             writer,
             _fmt: PhantomData,
         }
+    }
+
+    #[inline(always)]
+    ///Creates `tracing` layer.
+    ///
+    ///`Error` can happen during creation of worker thread.
+    pub fn layer(self) -> Result<Layer<F, worker::ThreadWorker>, std::io::Error> {
+        let consumer = worker::thread(self.tag, self.writer)?;
+
+        Ok(Layer {
+            consumer,
+            _fmt: PhantomData,
+        })
     }
 }

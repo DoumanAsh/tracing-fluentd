@@ -32,11 +32,21 @@ version = "0.2"
 default-features = false
 features = ["registry"]
 
+[dependencies.tracing]
+version = "0.1"
+default-features = false
+
 [dependencies]
 tracing-core = "0.1"
+crossbeam-channel = "0.5"
+rmp-serde = "0.15"
 
 [dev-dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.rmpv]
+version = "0.4"
+features = ["with-serde"]
 
 [dev-dependencies.tracing-subscriber]
 version = "0.2"
