@@ -61,18 +61,6 @@ impl FieldFormatter for NestedFmt {
         use core::ops::DerefMut;
 
         event.record(event_record.deref_mut());
-        let mut metadata = fluent::Map::new();
-
-        if let Some(name) = event.metadata().file() {
-            metadata.insert("file".to_owned(), name.to_owned().into());
-        }
-        if let Some(line) = event.metadata().line() {
-            metadata.insert("line".to_owned(), line.into());
-        }
-        metadata.insert("module".to_owned(), event.metadata().target().to_owned().into());
-        metadata.insert("level".to_owned(), event.metadata().level().to_owned().into());
-
-        event_record.insert("metadata".to_owned(), metadata.into());
 
         if let Some(span) = current_span {
             let extensions = span.extensions();
@@ -85,6 +73,19 @@ impl FieldFormatter for NestedFmt {
                 }
             }
         }
+
+        let mut metadata = fluent::Map::new();
+
+        if let Some(name) = event.metadata().file() {
+            metadata.insert("file".to_owned(), name.to_owned().into());
+        }
+        if let Some(line) = event.metadata().line() {
+            metadata.insert("line".to_owned(), line.into());
+        }
+        metadata.insert("module".to_owned(), event.metadata().target().to_owned().into());
+        metadata.insert("level".to_owned(), event.metadata().level().to_owned().into());
+
+        event_record.insert("metadata".to_owned(), metadata.into());
     }
 }
 
@@ -94,14 +95,6 @@ impl FieldFormatter for FlattenFmt {
         use core::ops::DerefMut;
 
         event.record(event_record.deref_mut());
-        if let Some(name) = event.metadata().file() {
-            event_record.insert("file".to_owned(), name.to_owned().into());
-        }
-        if let Some(line) = event.metadata().line() {
-            event_record.insert("line".to_owned(), line.into());
-        }
-        event_record.insert("module".to_owned(), event.metadata().target().to_owned().into());
-        event_record.insert("level".to_owned(), event.metadata().level().to_owned().into());
 
         if let Some(span) = current_span {
             let extensions = span.extensions();
@@ -115,6 +108,15 @@ impl FieldFormatter for FlattenFmt {
                 }
             }
         }
+
+        if let Some(name) = event.metadata().file() {
+            event_record.insert("file".to_owned(), name.to_owned().into());
+        }
+        if let Some(line) = event.metadata().line() {
+            event_record.insert("line".to_owned(), line.into());
+        }
+        event_record.insert("module".to_owned(), event.metadata().target().to_owned().into());
+        event_record.insert("level".to_owned(), event.metadata().level().to_owned().into());
     }
 }
 
