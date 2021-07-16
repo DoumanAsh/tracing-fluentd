@@ -5,7 +5,7 @@ use std::fs;
 
 #[tracing::instrument]
 fn test_func(arg: u8) {
-    tracing::debug!(arg = arg, "test func!");
+    tracing::debug!(arg2 = arg, "test func!");
 }
 
 #[track_caller]
@@ -67,14 +67,16 @@ fn should_nest_events_data() {
     drop(file);
     let _ = fs::remove_file(log_name);
 }
-//
+
 //#[test]
 //fn should_use_real_fluentd_server() {
 //    let layer = tracing_fluentd::Builder::new("rust").flatten().layer().expect("Create layer");
 //    let sub = Registry::default().with(layer);
 //    let guard = tracing::subscriber::set_default(sub);
 //    tracing::info!("LOLKA");
-//    test_func(3);
+//    for idx in 0..100 {
+//        test_func(idx);
+//    }
 //
 //    drop(guard);
 //}

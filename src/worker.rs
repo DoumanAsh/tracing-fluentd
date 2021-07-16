@@ -2,8 +2,6 @@ use core::{mem, time};
 
 use crate::{fluent, MakeWriter};
 
-const MAX_WAIT: time::Duration = time::Duration::from_secs(60);
-
 pub trait Consumer: 'static {
     fn record(&self, record: fluent::Record);
 }
@@ -34,6 +32,9 @@ impl Drop for ThreadWorker {
 }
 
 pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW) -> std::io::Result<ThreadWorker> {
+    const MAX_MSG_RECORD: usize = 10;
+    //const MAX_WAIT: time::Duration = time::Duration::from_secs(60);
+
     let (sender, recv) = crossbeam_channel::unbounded();
     let worker = std::thread::Builder::new().name("tracing-fluentd-worker".to_owned());
 
@@ -41,27 +42,23 @@ pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW) -> std::io::Result<
         let mut msg = fluent::Message::new(tag);
 
         'main_loop: loop {
-            'clean_queue: loop {
-                match recv.try_recv() {
-                    Ok(record) => {
-                        msg.add(record);
-                        if msg.len() >= 10 {
-                            break 'clean_queue;
-                        }
-                    },
-                    Err(crossbeam_channel::TryRecvError::Empty) => break 'clean_queue,
-                    Err(crossbeam_channel::TryRecvError::Disconnected) => break 'main_loop,
-                }
-            }
-
-            match recv.recv_timeout(MAX_WAIT) {
+            match recv.recv() {
                 Ok(record) => {
                     msg.add(record);
+
+                    //Free anything we have in queue up to MAX_MSG_RECORD
+                    while msg.len() < MAX_MSG_RECORD {
+                        match recv.try_recv() {
+                            Ok(record) => msg.add(record),
+                            Err(crossbeam_channel::TryRecvError::Empty) => break,
+                            Err(crossbeam_channel::TryRecvError::Disconnected) => break 'main_loop,
+                        }
+                    }
                 },
-                Err(crossbeam_channel::RecvTimeoutError::Timeout) => (),
-                Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break 'main_loop
+                Err(crossbeam_channel::RecvError) => break 'main_loop
             }
 
+            println!("msg.len()={}", msg.len());
             if msg.len() == 0 {
                 continue 'main_loop;
             }

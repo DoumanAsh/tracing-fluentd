@@ -1,6 +1,6 @@
 [package]
 name = "tracing-fluentd"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Douman <douman@gmx.se>"]
 edition = "2018"
 description = "Enables forwarding of `tracing` events towards the `fluentd` server."
