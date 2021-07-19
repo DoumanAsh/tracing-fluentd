@@ -31,7 +31,9 @@ fn should_flatten_events_data() {
 
     let guard = tracing::subscriber::set_default(sub);
     tracing::info!("LOLKA");
-    test_func(1);
+    for idx in 0..15 {
+        test_func(idx);
+    }
 
     drop(guard);
 
@@ -54,7 +56,9 @@ fn should_nest_events_data() {
 
     let guard = tracing::subscriber::set_default(sub);
     tracing::info!("LOLKA");
-    test_func(1);
+    for idx in 0..15 {
+        test_func(idx);
+    }
 
     drop(guard);
 

@@ -42,25 +42,21 @@ pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW) -> std::io::Result<
         let mut msg = fluent::Message::new(tag);
 
         'main_loop: loop {
-            match recv.recv() {
-                Ok(record) => {
-                    msg.add(record);
-
-                    //Free anything we have in queue up to MAX_MSG_RECORD
-                    while msg.len() < MAX_MSG_RECORD {
-                        match recv.try_recv() {
-                            Ok(record) => msg.add(record),
-                            Err(crossbeam_channel::TryRecvError::Empty) => break,
-                            Err(crossbeam_channel::TryRecvError::Disconnected) => break 'main_loop,
-                        }
-                    }
-                },
-                Err(crossbeam_channel::RecvError) => break 'main_loop
+            //Fetch up to MAX_MSG_RECORD
+            while msg.len() < MAX_MSG_RECORD {
+                match recv.recv() {
+                    Ok(record) => msg.add(record),
+                    Err(crossbeam_channel::RecvError) => break 'main_loop
+                }
             }
 
-            println!("msg.len()={}", msg.len());
-            if msg.len() == 0 {
-                continue 'main_loop;
+            //Get every extra record we can get at the current moment.
+            loop {
+                match recv.try_recv() {
+                    Ok(record) => msg.add(record),
+                    Err(crossbeam_channel::TryRecvError::Empty) => break,
+                    Err(crossbeam_channel::TryRecvError::Disconnected) => break 'main_loop
+                }
             }
 
             let mut writer = match writer.make() {
