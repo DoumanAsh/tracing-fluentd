@@ -47,31 +47,31 @@ fn should_flatten_events_data() {
     let _ = fs::remove_file(log_name);
 }
 
-#[test]
-fn should_nest_events_data() {
-    let (log_name, test_writer) = create_test_writer();
-
-    let layer = tracing_fluentd::Builder::new("rust").with_writer(test_writer).layer().expect("Create layer");
-    let sub = Registry::default().with(layer);
-
-    let guard = tracing::subscriber::set_default(sub);
-    tracing::info!("LOLKA");
-    for idx in 0..15 {
-        test_func(idx);
-    }
-
-    drop(guard);
-
-    let mut file = fs::File::open(log_name.as_str()).expect("To open logs");
-    while let Ok(Some(output)) = rmp_serde::from_read::<_, Option<rmpv::Value>>(&mut file) {
-        let output = format!("{}", output);
-        println!("output={}", output);
-    }
-
-    drop(file);
-    let _ = fs::remove_file(log_name);
-}
-
+//#[test]
+//fn should_nest_events_data() {
+//    let (log_name, test_writer) = create_test_writer();
+//
+//    let layer = tracing_fluentd::Builder::new("rust").with_writer(test_writer).layer().expect("Create layer");
+//    let sub = Registry::default().with(layer);
+//
+//    let guard = tracing::subscriber::set_default(sub);
+//    tracing::info!("LOLKA");
+//    for idx in 0..15 {
+//        test_func(idx);
+//    }
+//
+//    drop(guard);
+//
+//    let mut file = fs::File::open(log_name.as_str()).expect("To open logs");
+//    while let Ok(Some(output)) = rmp_serde::from_read::<_, Option<rmpv::Value>>(&mut file) {
+//        let output = format!("{}", output);
+//        println!("output={}", output);
+//    }
+//
+//    drop(file);
+//    let _ = fs::remove_file(log_name);
+//}
+//
 //#[test]
 //fn should_use_real_fluentd_server() {
 //    let layer = tracing_fluentd::Builder::new("rust").flatten().layer().expect("Create layer");

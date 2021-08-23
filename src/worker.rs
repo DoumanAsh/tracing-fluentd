@@ -2,20 +2,54 @@ use core::{mem, time};
 
 use crate::{fluent, MakeWriter};
 
+pub enum Message {
+    Record(fluent::Record),
+    Terminate,
+}
+
+impl Into<Message> for fluent::Record {
+    #[inline(always)]
+    fn into(self) -> Message {
+        Message::Record(self)
+    }
+}
+
 pub trait Consumer: 'static {
     fn record(&self, record: fluent::Record);
 }
 
+#[repr(transparent)]
+pub struct WorkerChannel(pub(crate) crossbeam_channel::Sender<Message>);
+
+impl Consumer for WorkerChannel {
+    #[inline(always)]
+    fn record(&self, record: fluent::Record) {
+        let _ = self.0.send(record.into());
+    }
+}
+
 pub struct ThreadWorker {
-    sender: mem::ManuallyDrop<crossbeam_channel::Sender<fluent::Record>>,
+    sender: mem::ManuallyDrop<crossbeam_channel::Sender<Message>>,
     worker: mem::ManuallyDrop<std::thread::JoinHandle<()>>,
+}
+
+impl ThreadWorker {
+    #[inline(always)]
+    pub fn sender(&self) -> crossbeam_channel::Sender<Message> {
+        mem::ManuallyDrop::into_inner(self.sender.clone())
+    }
+
+    #[inline(always)]
+    pub fn stop(&self) {
+        let _result = self.sender.send(Message::Terminate);
+        debug_assert!(_result.is_ok());
+    }
 }
 
 impl Consumer for ThreadWorker {
     #[inline(always)]
     fn record(&self, record: fluent::Record) {
-        let _result = self.sender.send(record);
-        debug_assert!(_result.is_ok());
+        let _ = self.sender.send(record.into());
     }
 }
 
@@ -45,17 +79,17 @@ pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW) -> std::io::Result<
             //Fetch up to MAX_MSG_RECORD
             while msg.len() < MAX_MSG_RECORD {
                 match recv.recv() {
-                    Ok(record) => msg.add(record),
-                    Err(crossbeam_channel::RecvError) => break 'main_loop
+                    Ok(Message::Record(record)) => msg.add(record),
+                    Ok(Message::Terminate) | Err(crossbeam_channel::RecvError) => break 'main_loop
                 }
             }
 
             //Get every extra record we can get at the current moment.
             loop {
                 match recv.try_recv() {
-                    Ok(record) => msg.add(record),
+                    Ok(Message::Record(record)) => msg.add(record),
                     Err(crossbeam_channel::TryRecvError::Empty) => break,
-                    Err(crossbeam_channel::TryRecvError::Disconnected) => break 'main_loop
+                    Ok(Message::Terminate) | Err(crossbeam_channel::TryRecvError::Disconnected) => break 'main_loop
                 }
             }
 

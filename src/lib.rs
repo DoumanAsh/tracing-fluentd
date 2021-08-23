@@ -133,6 +133,9 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     #[inline(always)]
     ///Creates `tracing` layer.
     ///
+    ///If you do not want to create multiple threads, consider using
+    ///`layer_guarded`/`layer_from_guard`.
+    ///
     ///`Error` can happen during creation of worker thread.
     pub fn layer(self) -> Result<Layer<F, worker::ThreadWorker>, std::io::Error> {
         let consumer = worker::thread(self.tag, self.writer)?;
@@ -141,5 +144,53 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
             consumer,
             _fmt: PhantomData,
         })
+    }
+
+    #[inline]
+    ///Creates `tracing` layer, returning guard that allows to stop `fluentd` worker on `Drop`.
+    ///
+    ///This may be necessary due to bad API that `tracing` provides to control lifetime of global
+    ///logger. As underlying implementations employs caching, it needs to perform flush once logger
+    ///is no longer necessary hence this API is provided.
+    ///
+    ///`Error` can happen during creation of worker thread.
+    pub fn layer_guarded(self) -> Result<(Layer<F, worker::WorkerChannel>, FlushingGuard), std::io::Error> {
+        let consumer = worker::thread(self.tag, self.writer)?;
+        let guard = FlushingGuard(consumer);
+        let layer = Layer {
+            consumer: worker::WorkerChannel(guard.0.sender()),
+            _fmt: PhantomData,
+        };
+
+        Ok((layer, guard))
+    }
+
+    #[inline(always)]
+    ///Creates `tracing` layer, using guard returned by  `layer_guarded`.
+    ///
+    ///Specifically, it will use the same worker thread as first instance of `layer_guarded`,
+    ///without affecting lifetime of `guard`.
+    ///Hence once `guard` is dropped, worker for all connected layers will stop sending logs.
+    ///
+    ///`Error` can happen during creation of worker thread.
+    pub fn layer_from_guard(self, guard: &FlushingGuard) -> Layer<F, worker::WorkerChannel> {
+        Layer {
+            consumer: worker::WorkerChannel(guard.0.sender()),
+            _fmt: PhantomData,
+        }
+    }
+}
+
+#[repr(transparent)]
+///Guard that flushes and terminates `fluentd` worker.
+///
+///Droping this guard should be done only when `Layer` is no longer needed.
+///
+///As part of destructor, it awaits to finish flushing `fluentd` records.
+pub struct FlushingGuard(worker::ThreadWorker);
+
+impl Drop for FlushingGuard {
+    fn drop(&mut self) {
+        self.0.stop();
     }
 }
