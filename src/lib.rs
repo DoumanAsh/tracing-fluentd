@@ -54,6 +54,22 @@ pub trait MakeWriter: 'static + Send {
     fn make(&self) -> std::io::Result<Self::Writer>;
 }
 
+impl MakeWriter for std::vec::IntoIter<std::net::SocketAddr> {
+    type Writer = std::net::TcpStream;
+
+    #[inline(always)]
+    fn make(&self) -> std::io::Result<Self::Writer> {
+        for addr in self.as_slice().iter() {
+            match std::net::TcpStream::connect_timeout(addr, core::time::Duration::from_secs(1)) {
+                Ok(socket) => return Ok(socket),
+                Err(_) => continue,
+            }
+        }
+
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "cannot connect to fluentd"))
+    }
+}
+
 impl<W: Write, T: 'static + Send + Fn() -> std::io::Result<W>> MakeWriter for T {
     type Writer = W;
     #[inline(always)]
