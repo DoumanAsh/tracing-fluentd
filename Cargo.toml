@@ -1,6 +1,6 @@
 [package]
 name = "tracing-fluentd"
-version = "0.1.7"
+version = "0.3.0"
 authors = ["Douman <douman@gmx.se>"]
 edition = "2018"
 description = "Enables forwarding of `tracing` events towards the `fluentd` server."
@@ -24,7 +24,7 @@ version = "1.7"
 features = ["serde"]
 
 [dependencies.tracing-subscriber]
-version = "0.2.19"
+version = "0.3.8"
 default-features = false
 features = ["registry"]
 
@@ -45,6 +45,6 @@ version = "0.4"
 features = ["with-serde"]
 
 [dev-dependencies.tracing-subscriber]
-version = "0.2"
+version = "0.3.8"
 default-features = false
 features = ["registry", "fmt"]

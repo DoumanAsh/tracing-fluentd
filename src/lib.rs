@@ -15,7 +15,6 @@
 
 use std::net::{TcpStream, SocketAddrV4, SocketAddr, Ipv4Addr};
 use std::io::Write;
-use core::marker::PhantomData;
 
 mod tracing;
 pub mod fluent;
@@ -73,7 +72,7 @@ fn default() -> std::io::Result<TcpStream> {
 ///`tracing`'s Layer
 pub struct Layer<F, C> {
     consumer: C,
-    _fmt: PhantomData<F>,
+    fmt: F,
 }
 
 ///Builder to enable forwarding `tracing` events towards the `fluentd` server.
@@ -85,7 +84,7 @@ pub struct Layer<F, C> {
 pub struct Builder<F=NestedFmt, A=fn() -> std::io::Result<TcpStream>> {
     tag: &'static str,
     writer: A,
-    _fmt: PhantomData<F>
+    fmt: F
 }
 
 impl Builder {
@@ -99,7 +98,7 @@ impl Builder {
         Self {
             tag,
             writer: default,
-            _fmt: PhantomData,
+            fmt: NestedFmt,
         }
     }
 }
@@ -112,7 +111,7 @@ impl<A: MakeWriter> Builder<NestedFmt, A> {
         Builder {
             tag: self.tag,
             writer: self.writer,
-            _fmt: PhantomData,
+            fmt: FlattenFmt,
         }
     }
 }
@@ -123,11 +122,24 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     ///
     ///Normally fluentd server expects connection to be closed immediately upon sending records.
     ///hence created writer is dropped immediately upon writing being finished.
+    pub fn with_formatter<NF: FieldFormatter>(self, fmt: NF) -> Builder<NF, A> {
+        Builder {
+            tag: self.tag,
+            writer: self.writer,
+            fmt,
+        }
+    }
+
+    #[inline(always)]
+    ///Provides callback to get writer where to write records.
+    ///
+    ///Normally fluentd server expects connection to be closed immediately upon sending records.
+    ///hence created writer is dropped immediately upon writing being finished.
     pub fn with_writer<MW: MakeWriter>(self, writer: MW) -> Builder<F, MW> {
         Builder {
             tag: self.tag,
             writer,
-            _fmt: PhantomData,
+            fmt: self.fmt,
         }
     }
 
@@ -143,7 +155,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
 
         Ok(Layer {
             consumer,
-            _fmt: PhantomData,
+            fmt: self.fmt,
         })
     }
 
@@ -160,7 +172,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
         let guard = FlushingGuard(consumer);
         let layer = Layer {
             consumer: worker::WorkerChannel(guard.0.sender()),
-            _fmt: PhantomData,
+            fmt: self.fmt,
         };
 
         Ok((layer, guard))
@@ -177,7 +189,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     pub fn layer_from_guard(self, guard: &FlushingGuard) -> Layer<F, worker::WorkerChannel> {
         Layer {
             consumer: worker::WorkerChannel(guard.0.sender()),
-            _fmt: PhantomData,
+            fmt: self.fmt,
         }
     }
 }

@@ -23,7 +23,7 @@ pub trait FieldFormatter: 'static {
     ///Handler for when `Layer::new_span` is invoked.
     ///
     ///By default uses span's extensions to store `fluent::Map` containing attributes of the span.
-    fn new_span<C: Collect + for<'a> LookupSpan<'a>>(attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
+    fn on_new_span<C: Collect + for<'a> LookupSpan<'a>>(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
         let span = get_span!(ctx[id]);
 
         if span.extensions().get::<fluent::Map>().is_none() {
@@ -39,7 +39,7 @@ pub trait FieldFormatter: 'static {
     ///
     ///By default uses span's extensions to store extra attributes of span within `fluent::Map`,
     ///created by  new_span, if any.
-    fn on_record<C: Collect + for<'a> LookupSpan<'a>>(id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
+    fn on_record<C: Collect + for<'a> LookupSpan<'a>>(&self, id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
         let span = get_span!(ctx[id]);
 
         let mut extensions = span.extensions_mut();
@@ -52,12 +52,12 @@ pub trait FieldFormatter: 'static {
     ///
     ///Given `record` must be filled with data, after exiting this method, `record` is sent to the
     ///fluentd
-    fn on_event<'a, R: LookupSpan<'a>>(record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>);
+    fn on_event<'a, R: LookupSpan<'a>>(&self, record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>);
 }
 
 impl FieldFormatter for NestedFmt {
     #[inline(always)]
-    fn on_event<'a, R: LookupSpan<'a>>(event_record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>) {
+    fn on_event<'a, R: LookupSpan<'a>>(&self, event_record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>) {
         use core::ops::DerefMut;
 
         event.record(event_record.deref_mut());
@@ -91,7 +91,7 @@ impl FieldFormatter for NestedFmt {
 
 impl FieldFormatter for FlattenFmt {
     #[inline(always)]
-    fn on_event<'a, R: LookupSpan<'a>>(event_record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>) {
+    fn on_event<'a, R: LookupSpan<'a>>(&self, event_record: &mut fluent::Record, event: &Event<'_>, current_span: Option<SpanRef<'a, R>>) {
         use core::ops::DerefMut;
 
         event.record(event_record.deref_mut());
@@ -156,13 +156,13 @@ impl tracing_core::field::Visit for fluent::Map {
 
 impl<F: FieldFormatter, W: worker::Consumer, C: Collect + for<'a> LookupSpan<'a>> tracing_subscriber::layer::Layer<C> for Layer<F, W> {
     #[inline(always)]
-    fn new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
-        F::new_span(attrs, id, ctx);
+    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, C>) {
+        self.fmt.on_new_span(attrs, id, ctx);
     }
 
     #[inline(always)]
     fn on_record(&self, id: &Id, values: &Record<'_>, ctx: Context<'_, C>) {
-        F::on_record(id, values, ctx);
+        self.fmt.on_record(id, values, ctx);
     }
 
     #[inline(always)]
@@ -181,61 +181,8 @@ impl<F: FieldFormatter, W: worker::Consumer, C: Collect + for<'a> LookupSpan<'a>
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, C>) {
         let mut record = fluent::Record::now();
 
-        F::on_event(&mut record, event, ctx.event_span(event));
+        self.fmt.on_event(&mut record, event, ctx.event_span(event));
 
         self.consumer.record(record);
     }
 }
-
-//TODO: Subscriber?
-//impl<F: FieldFormatter, A: MakeWriter + 'static> tracing_core::subscriber::Subscriber for Builder<F, A> {
-//    fn enabled(&self, _: &Metadata<'_>) -> bool {
-//        true
-//    }
-//
-//    fn new_span(&self, attrs: &Attributes<'_>) -> Id {
-//        let mut hasher = xxhash_rust::xxh3::Xxh3::new();
-//
-//        hasher.update(attrs.metadata().name().as_bytes());
-//        hasher.update(attrs.metadata().target().as_bytes());
-//        if let Some(module) = attrs.metadata().module_path() {
-//            hasher.update(module.as_bytes());
-//        }
-//        if let Some(file) = attrs.metadata().file() {
-//            hasher.update(file.as_bytes());
-//        }
-//        if let Some(line) = attrs.metadata().line() {
-//            hasher.update(&line.to_le_bytes());
-//        }
-//        for field in attrs.metadata().fields() {
-//            hasher.update(field.name().as_bytes());
-//        }
-//
-//        match core::num::NonZeroU64::new(hasher.digest()) {
-//            Some(num) => Id::from_non_zero_u64(num),
-//            None => Id::from_non_zero_u64(unsafe {
-//                core::num::NonZeroU64::new_unchecked(u64::max_value())
-//            }),
-//        }
-//    }
-//
-//    fn record(&self, _span: &Id, _values: &Record<'_>) {
-//        todo!();
-//    }
-//
-//    fn record_follows_from(&self, _span: &Id, _follows: &Id) {
-//        todo!();
-//    }
-//
-//    fn event(&self, _event: &Event<'_>) {
-//        todo!();
-//    }
-//
-//    fn enter(&self, _span: &Id) {
-//        todo!();
-//    }
-//
-//    fn exit(&self, _span: &Id) {
-//        todo!();
-//    }
-//}
