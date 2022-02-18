@@ -6,7 +6,7 @@
 
 Enables forwarding of `tracing` events towards the `fluentd` server.
 
-Version corresponds to `tracing` version.
+Version corresponds to `tracing-subscriber` version.
 
 ## Example
 
