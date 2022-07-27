@@ -5,7 +5,11 @@ use std::fs;
 
 #[tracing::instrument]
 fn test_func(arg: u8) {
-    tracing::debug!(arg2 = arg, "test func!");
+    tracing::info_span!("test custom span").in_scope(|| {
+        tracing::info_span!("test more span").in_scope(|| {
+            tracing::debug!(arg2 = arg, "test func!");
+        })
+    })
 }
 
 #[track_caller]
