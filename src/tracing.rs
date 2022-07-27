@@ -64,10 +64,7 @@ impl FieldFormatter for NestedFmt {
 
         if let Some(span) = current_span {
             let extensions = span.extensions();
-            if let Some(record) = extensions.get::<fluent::Map>() {
-                event_record.insert(span.name().to_owned(), record.clone().into());
-            }
-            while let Some(span) = span.parent() {
+            for span in span.scope() {
                 if let Some(record) = extensions.get::<fluent::Map>() {
                     event_record.insert(span.name().to_owned(), record.clone().into());
                 }
@@ -97,14 +94,10 @@ impl FieldFormatter for FlattenFmt {
         event.record(event_record.deref_mut());
 
         if let Some(span) = current_span {
-            let extensions = span.extensions();
-            if let Some(record) = extensions.get::<fluent::Map>() {
-                event_record.update(record);
-            }
-            while let Some(span) = span.parent() {
+            for span in span.scope() {
                 let extensions = span.extensions();
                 if let Some(record) = extensions.get::<fluent::Map>() {
-                    event_record.update(record)
+                    event_record.update(record);
                 }
             }
         }
