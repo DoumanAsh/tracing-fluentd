@@ -65,8 +65,7 @@ impl Drop for ThreadWorker {
     }
 }
 
-pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW) -> std::io::Result<ThreadWorker> {
-    const MAX_MSG_RECORD: usize = 10;
+pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW, max_msg_record: usize) -> std::io::Result<ThreadWorker> {
     //const MAX_WAIT: time::Duration = time::Duration::from_secs(60);
 
     let (sender, recv) = crossbeam_channel::unbounded();
@@ -76,8 +75,8 @@ pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW) -> std::io::Result<
         let mut msg = fluent::Message::new(tag);
 
         'main_loop: loop {
-            //Fetch up to MAX_MSG_RECORD
-            while msg.len() < MAX_MSG_RECORD {
+            //Fetch up to max_msg_record
+            while msg.len() < max_msg_record {
                 match recv.recv() {
                     Ok(Message::Record(record)) => msg.add(record),
                     Ok(Message::Terminate) | Err(crossbeam_channel::RecvError) => break 'main_loop

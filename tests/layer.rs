@@ -30,7 +30,7 @@ fn create_test_writer() -> (String, impl tracing_fluentd::MakeWriter<Writer=fs::
 fn should_flatten_events_data() {
     let (log_name, test_writer) = create_test_writer();
 
-    let layer = tracing_fluentd::Builder::new("rust").with_writer(test_writer).flatten().layer().expect("Create layer");
+    let layer = tracing_fluentd::Builder::new("rust").with_max_msg_record(10).with_writer(test_writer).flatten().layer().expect("Create layer");
     let sub = Registry::default().with(layer);
 
     let guard = tracing::subscriber::set_default(sub);
