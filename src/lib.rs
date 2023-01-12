@@ -13,6 +13,7 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 
+use core::num::NonZeroUsize;
 use std::net::{TcpStream, SocketAddrV4, SocketAddr, Ipv4Addr};
 use std::io::Write;
 
@@ -84,7 +85,8 @@ pub struct Layer<F, C> {
 pub struct Builder<F=NestedFmt, A=fn() -> std::io::Result<TcpStream>> {
     tag: &'static str,
     writer: A,
-    fmt: F
+    fmt: F,
+    max_msg_record: NonZeroUsize,
 }
 
 impl Builder {
@@ -95,10 +97,23 @@ impl Builder {
     ///
     ///`tag` - Event category to send for each record.
     pub fn new(tag: &'static str) -> Self {
+        const DEFAULT_MAX_MSG_RECORD: usize = 10;
         Self {
             tag,
             writer: default,
             fmt: NestedFmt,
+            max_msg_record: NonZeroUsize::new(DEFAULT_MAX_MSG_RECORD).unwrap(),
+        }
+    }
+
+    #[inline(always)]
+    ///Provides max message record to fetch up.
+    pub fn with_max_msg_record(self, max_msg_record: NonZeroUsize) -> Self {
+        Self {
+            tag: self.tag,
+            writer: self.writer,
+            fmt: self.fmt,
+            max_msg_record,
         }
     }
 }
@@ -112,6 +127,7 @@ impl<A: MakeWriter> Builder<NestedFmt, A> {
             tag: self.tag,
             writer: self.writer,
             fmt: FlattenFmt,
+            max_msg_record: self.max_msg_record,
         }
     }
 }
@@ -127,6 +143,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
             tag: self.tag,
             writer: self.writer,
             fmt,
+            max_msg_record: self.max_msg_record,
         }
     }
 
@@ -140,6 +157,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
             tag: self.tag,
             writer,
             fmt: self.fmt,
+            max_msg_record: self.max_msg_record,
         }
     }
 
@@ -151,7 +169,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     ///
     ///`Error` can happen during creation of worker thread.
     pub fn layer(self) -> Result<Layer<F, worker::ThreadWorker>, std::io::Error> {
-        let consumer = worker::thread(self.tag, self.writer)?;
+        let consumer = worker::thread(self.tag, self.writer, self.max_msg_record)?;
 
         Ok(Layer {
             consumer,
@@ -168,7 +186,7 @@ impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     ///
     ///`Error` can happen during creation of worker thread.
     pub fn layer_guarded(self) -> Result<(Layer<F, worker::WorkerChannel>, FlushingGuard), std::io::Error> {
-        let consumer = worker::thread(self.tag, self.writer)?;
+        let consumer = worker::thread(self.tag, self.writer, self.max_msg_record)?;
         let guard = FlushingGuard(consumer);
         let layer = Layer {
             consumer: worker::WorkerChannel(guard.0.sender()),
