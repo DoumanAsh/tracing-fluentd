@@ -1,4 +1,4 @@
-use core::{mem, time};
+use core::{mem, num::NonZeroUsize, time};
 
 use crate::{fluent, MakeWriter};
 
@@ -65,7 +65,7 @@ impl Drop for ThreadWorker {
     }
 }
 
-pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW, max_msg_record: usize) -> std::io::Result<ThreadWorker> {
+pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW, max_msg_record: NonZeroUsize) -> std::io::Result<ThreadWorker> {
     //const MAX_WAIT: time::Duration = time::Duration::from_secs(60);
 
     let (sender, recv) = crossbeam_channel::unbounded();
@@ -76,7 +76,7 @@ pub fn thread<MW: MakeWriter>(tag: &'static str, writer: MW, max_msg_record: usi
 
         'main_loop: loop {
             //Fetch up to max_msg_record
-            while msg.len() < max_msg_record {
+            while msg.len() < usize::from(max_msg_record) {
                 match recv.recv() {
                     Ok(Message::Record(record)) => msg.add(record),
                     Ok(Message::Terminate) | Err(crossbeam_channel::RecvError) => break 'main_loop
