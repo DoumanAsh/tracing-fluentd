@@ -13,9 +13,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 
-use core::num::NonZeroUsize;
 use std::net::{TcpStream, SocketAddrV4, SocketAddr, Ipv4Addr};
 use std::io::Write;
+use core::num;
 
 mod tracing;
 pub mod fluent;
@@ -86,7 +86,7 @@ pub struct Builder<F=NestedFmt, A=fn() -> std::io::Result<TcpStream>> {
     tag: &'static str,
     writer: A,
     fmt: F,
-    max_msg_record: NonZeroUsize,
+    max_msg_record: usize,
 }
 
 impl Builder {
@@ -102,18 +102,18 @@ impl Builder {
             tag,
             writer: default,
             fmt: NestedFmt,
-            max_msg_record: NonZeroUsize::new(DEFAULT_MAX_MSG_RECORD).unwrap(),
+            max_msg_record: DEFAULT_MAX_MSG_RECORD,
         }
     }
 
     #[inline(always)]
     ///Provides max message record to fetch up.
-    pub fn with_max_msg_record(self, max_msg_record: NonZeroUsize) -> Self {
+    pub fn with_max_msg_record(self, max_msg_record: num::NonZeroUsize) -> Self {
         Self {
             tag: self.tag,
             writer: self.writer,
             fmt: self.fmt,
-            max_msg_record,
+            max_msg_record: max_msg_record.get()
         }
     }
 }
