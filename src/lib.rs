@@ -134,10 +134,7 @@ impl<A: MakeWriter> Builder<NestedFmt, A> {
 
 impl<F: FieldFormatter, A: MakeWriter> Builder<F, A> {
     #[inline(always)]
-    ///Provides callback to get writer where to write records.
-    ///
-    ///Normally fluentd server expects connection to be closed immediately upon sending records.
-    ///hence created writer is dropped immediately upon writing being finished.
+    ///Provides formatter.
     pub fn with_formatter<NF: FieldFormatter>(self, fmt: NF) -> Builder<NF, A> {
         Builder {
             tag: self.tag,
