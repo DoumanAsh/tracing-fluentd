@@ -1,6 +1,6 @@
 [package]
 name = "tracing-fluentd"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Douman <douman@gmx.se>"]
 edition = "2018"
 description = "Enables forwarding of `tracing` events towards the `fluentd` server."
@@ -35,13 +35,13 @@ default-features = false
 [dependencies]
 tracing-core = "0.1"
 crossbeam-channel = "0.5"
-rmp-serde = "0.15"
+rmp-serde = "1.1.1"
 
 [dev-dependencies.tracing]
 version = "0.1"
 
 [dev-dependencies.rmpv]
-version = "0.4"
+version = "1"
 features = ["with-serde"]
 
 [dev-dependencies.tracing-subscriber]
