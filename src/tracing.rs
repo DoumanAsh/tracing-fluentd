@@ -66,7 +66,7 @@ impl FieldFormatter for NestedFmt {
             for span in span.scope() {
                 let extensions = span.extensions();
                 if let Some(record) = extensions.get::<fluent::Map>() {
-                    event_record.insert(span.name().to_owned(), record.clone().into());
+                    event_record.insert(span.name().into(), record.clone().into());
                 }
             }
         }
@@ -74,15 +74,15 @@ impl FieldFormatter for NestedFmt {
         let mut metadata = fluent::Map::new();
 
         if let Some(name) = event.metadata().file() {
-            metadata.insert("file".to_owned(), name.to_owned().into());
+            metadata.insert("file".into(), name.into());
         }
         if let Some(line) = event.metadata().line() {
-            metadata.insert("line".to_owned(), line.into());
+            metadata.insert("line".into(), line.into());
         }
-        metadata.insert("module".to_owned(), event.metadata().target().to_owned().into());
-        metadata.insert("level".to_owned(), event.metadata().level().to_owned().into());
+        metadata.insert("module".into(), event.metadata().target().into());
+        metadata.insert("level".into(), event.metadata().level().to_owned().into());
 
-        event_record.insert("metadata".to_owned(), metadata.into());
+        event_record.insert("metadata".into(), metadata.into());
     }
 }
 
@@ -103,13 +103,13 @@ impl FieldFormatter for FlattenFmt {
         }
 
         if let Some(name) = event.metadata().file() {
-            event_record.insert("file".to_owned(), name.to_owned().into());
+            event_record.insert("file".into(), name.into());
         }
         if let Some(line) = event.metadata().line() {
-            event_record.insert("line".to_owned(), line.into());
+            event_record.insert("line".into(), line.into());
         }
-        event_record.insert("module".to_owned(), event.metadata().target().to_owned().into());
-        event_record.insert("level".to_owned(), event.metadata().level().to_owned().into());
+        event_record.insert("module".into(), event.metadata().target().into());
+        event_record.insert("level".into(), event.metadata().level().to_owned().into());
     }
 }
 
@@ -117,33 +117,33 @@ impl tracing_core::field::Visit for fluent::Map {
     #[inline(always)]
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         let value = format!("{:?}", value);
-        self.insert(field.name().to_owned(), value.into());
+        self.insert(field.name().into(), value.into());
     }
 
     #[inline(always)]
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.insert(field.name().to_owned(), value.into());
+        self.insert(field.name().into(), value.into());
     }
 
     #[inline(always)]
     fn record_u64(&mut self, field: &Field, value: u64) {
-        self.insert(field.name().to_owned(), value.into());
+        self.insert(field.name().into(), value.into());
     }
 
     #[inline(always)]
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.insert(field.name().to_owned(), value.into());
+        self.insert(field.name().into(), value.into());
     }
 
     #[inline(always)]
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.insert(field.name().to_owned(), value.to_owned().into());
+        self.insert(field.name().into(), value.to_owned().into());
     }
 
     #[inline(always)]
     fn record_error(&mut self, field: &Field, value: &(dyn std::error::Error + 'static)) {
         let value = format!("{}", value);
-        self.insert(field.name().to_owned(), value.into());
+        self.insert(field.name().into(), value.into());
     }
 }
 

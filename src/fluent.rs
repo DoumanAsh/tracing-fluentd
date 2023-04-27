@@ -2,11 +2,12 @@
 use serde::ser::{Serialize, Serializer, SerializeTuple, SerializeMap};
 
 use core::fmt;
+use std::borrow::Cow;
 
 #[derive(Clone)]
 #[repr(transparent)]
 ///HashMap object suitable for fluent record.
-pub struct Map(indexmap::IndexMap<String, Value>);
+pub struct Map(indexmap::IndexMap<Cow<'static, str>, Value>);
 
 impl Map {
     #[inline(always)]
@@ -24,7 +25,7 @@ impl core::fmt::Debug for Map {
 }
 
 impl core::ops::Deref for Map {
-    type Target = indexmap::IndexMap<String, Value>;
+    type Target = indexmap::IndexMap<Cow<'static, str>, Value>;
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
@@ -54,7 +55,9 @@ pub enum Value {
     ///Unsigned integer
     Uint(u64),
     ///String
-    Str(String),
+    Str(&'static str),
+    ///Owned string
+    String(String),
     ///Event level
     EventLevel(tracing_core::Level),
     ///Object
@@ -89,10 +92,17 @@ impl From<u64> for Value {
     }
 }
 
+impl From<&'static str> for Value {
+    #[inline(always)]
+    fn from(val: &'static str) -> Self {
+        Self::Str(val)
+    }
+}
+
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        Self::Str(val)
+        Self::String(val)
     }
 }
 
@@ -119,6 +129,7 @@ impl fmt::Debug for Value {
             Value::Uint(val) => fmt::Display::fmt(val, fmt),
             Value::EventLevel(val) => fmt::Debug::fmt(val, fmt),
             Value::Str(val) => fmt::Debug::fmt(val, fmt),
+            Value::String(val) => fmt::Debug::fmt(val, fmt),
             Value::Object(val) => fmt::Debug::fmt(val, fmt),
         }
     }
@@ -239,6 +250,7 @@ impl Serialize for Value {
             Value::Uint(val) => ser.serialize_u64(*val),
             Value::EventLevel(val) => ser.serialize_str(tracing_level_to_str(*val)),
             Value::Str(val) => ser.serialize_str(val),
+            Value::String(val) => ser.serialize_str(val),
             Value::Object(val) => {
                 let mut map = ser.serialize_map(Some(val.len()))?;
                 for (key, value) in val.iter() {
