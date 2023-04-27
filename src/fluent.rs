@@ -1,6 +1,8 @@
 //!Fluentd forward protocol definitions.
 use serde::ser::{Serialize, Serializer, SerializeTuple, SerializeMap};
 
+use core::fmt;
+
 #[derive(Clone)]
 #[repr(transparent)]
 ///HashMap object suitable for fluent record.
@@ -36,8 +38,6 @@ impl core::ops::DerefMut for Map {
         &mut self.0
     }
 }
-
-use core::fmt;
 
 #[derive(Debug)]
 pub(crate) struct Opts {
@@ -114,12 +114,12 @@ impl fmt::Debug for Value {
     #[inline(always)]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::Bool(val) => fmt.write_fmt(format_args!("{}", val)),
-            Value::Int(val) => fmt.write_fmt(format_args!("{}", val)),
-            Value::Uint(val) => fmt.write_fmt(format_args!("{}", val)),
-            Value::EventLevel(val) => fmt.write_fmt(format_args!("{:?}", val)),
-            Value::Str(val) => fmt.write_fmt(format_args!("{:?}", val)),
-            Value::Object(val) => fmt.write_fmt(format_args!("{:?}", val)),
+            Value::Bool(val) => fmt::Display::fmt(val, fmt),
+            Value::Int(val) => fmt::Display::fmt(val, fmt),
+            Value::Uint(val) => fmt::Display::fmt(val, fmt),
+            Value::EventLevel(val) => fmt::Debug::fmt(val, fmt),
+            Value::Str(val) => fmt::Debug::fmt(val, fmt),
+            Value::Object(val) => fmt::Debug::fmt(val, fmt),
         }
     }
 }
@@ -132,6 +132,7 @@ pub struct Record {
 }
 
 impl Record {
+    #[inline(always)]
     ///Creates record with current timestamp
     pub fn now() -> Self {
         let time = match std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH) {
@@ -145,6 +146,7 @@ impl Record {
         }
     }
 
+    #[inline(always)]
     ///Merges record entries with provided map
     pub fn update(&mut self, other: &Map) {
         for (key, value) in other.iter() {
