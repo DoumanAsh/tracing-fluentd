@@ -138,7 +138,7 @@ impl fmt::Debug for Value {
 #[derive(Debug)]
 ///Representation of fluent entry within `Message`
 pub struct Record {
-    time: u64,
+    time: u128,
     entries: Map,
 }
 
@@ -147,7 +147,7 @@ impl Record {
     ///Creates record with current timestamp
     pub fn now() -> Self {
         let time = match std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH) {
-            Ok(time) => time.as_secs(),
+            Ok(time) => time.as_nanos(),
             Err(_) => panic!("SystemTime is before UNIX!?"),
         };
 
