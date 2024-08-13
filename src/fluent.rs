@@ -136,6 +136,27 @@ impl fmt::Debug for Value {
     }
 }
 
+struct Int8([u8; 8]);
+
+impl Serialize for Int8 {
+    #[inline]
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(&self.0)
+    }
+}
+
+//rmpv derives extension type of bytes size
+struct ExtType((i8, Int8));
+
+impl Serialize for ExtType {
+    #[inline]
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use rmp_serde::MSGPACK_EXT_STRUCT_NAME;
+
+        serializer.serialize_newtype_struct(MSGPACK_EXT_STRUCT_NAME, &self.0)
+    }
+}
+
 #[derive(Debug)]
 ///Representation of fluent entry within `Message`
 pub struct Record {
@@ -288,7 +309,19 @@ impl Serialize for Record {
     fn serialize<SER: Serializer>(&self, ser: SER) -> Result<SER::Ok, SER::Error> {
         let mut seq = ser.serialize_tuple(2)?;
 
-        seq.serialize_element(&self.time.as_secs_f64())?;
+        //seq.serialize_element(&self.time.as_secs())?;
+        //
+        //Serialize time as EventTime ext
+        //https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1.5#eventtime-ext-format
+        //This is valid up to year 2106
+        let seconds = self.time.as_secs() as u32;
+        let nanos = self.time.subsec_nanos();
+        let seconds = seconds.to_be_bytes();
+        let nanos = nanos.to_be_bytes();
+        let time = [seconds[0], seconds[1], seconds[2], seconds[3], nanos[0], nanos[1], nanos[2], nanos[3]];
+        let time = ExtType((0, Int8(time)));
+        seq.serialize_element(&time)?;
+
         seq.serialize_element(&self.entries)?;
         seq.end()
     }
