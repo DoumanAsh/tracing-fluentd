@@ -6,7 +6,9 @@
 
 Enables forwarding of `tracing` events towards the `fluentd` server.
 
-Version corresponds to `tracing-subscriber` version.
+## Features
+
+- `event_time` - Specifies to encode timestamp as EventTime instead of default unix timestamp
 
 ## Example
 
