@@ -20,7 +20,7 @@ default-features = false
 features = ["alloc"]
 
 [dependencies.indexmap]
-version = "1.7"
+version = "1"
 features = ["serde"]
 
 [dependencies.tracing-subscriber]
@@ -35,7 +35,7 @@ default-features = false
 [dependencies]
 tracing-core = "0.1"
 crossbeam-channel = "0.5"
-rmp-serde = "1.1.1"
+rmp-serde = "1"
 
 [dev-dependencies.tracing]
 version = "0.1"
