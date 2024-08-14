@@ -1,5 +1,9 @@
 //! [tracing](https://github.com/tokio-rs/tracing) for [fluentd](https://www.fluentd.org/).
 //!
+//!## Features
+//!
+//!- `event_time` - Specifies to encode timestamp as EventTime instead of default unix timestamp
+//!
 //!## Example
 //!
 //!```rust

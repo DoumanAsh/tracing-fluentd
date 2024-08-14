@@ -1,6 +1,7 @@
 //!Fluentd forward protocol definitions.
 use serde::ser::{Serialize, Serializer, SerializeTuple, SerializeMap};
 
+use std::time;
 use core::fmt;
 use std::borrow::Cow;
 
@@ -138,7 +139,7 @@ impl fmt::Debug for Value {
 #[derive(Debug)]
 ///Representation of fluent entry within `Message`
 pub struct Record {
-    time: u64,
+    time: time::Duration,
     entries: Map,
 }
 
@@ -146,8 +147,8 @@ impl Record {
     #[inline(always)]
     ///Creates record with current timestamp
     pub fn now() -> Self {
-        let time = match std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH) {
-            Ok(time) => time.as_secs(),
+        let time = match time::SystemTime::now().duration_since(time::SystemTime::UNIX_EPOCH) {
+            Ok(time) => time,
             Err(_) => panic!("SystemTime is before UNIX!?"),
         };
 
@@ -286,7 +287,48 @@ impl Serialize for Record {
     #[inline]
     fn serialize<SER: Serializer>(&self, ser: SER) -> Result<SER::Ok, SER::Error> {
         let mut seq = ser.serialize_tuple(2)?;
-        seq.serialize_element(&self.time)?;
+
+        let seconds = self.time.as_secs();
+        #[cfg(feature = "event_time")]
+        {
+            struct Int8([u8; 8]);
+
+            impl Serialize for Int8 {
+                #[inline]
+                fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                    serializer.serialize_bytes(&self.0)
+                }
+            }
+
+            //rmpv derives extension type of bytes size
+            struct ExtType((i8, Int8));
+
+            impl Serialize for ExtType {
+                #[inline]
+                fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                    use rmp_serde::MSGPACK_EXT_STRUCT_NAME;
+
+                    serializer.serialize_newtype_struct(MSGPACK_EXT_STRUCT_NAME, &self.0)
+                }
+            }
+
+            //seq.serialize_element(&self.time.as_secs())?;
+            //
+            //Serialize time as EventTime ext
+            //https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1.5#eventtime-ext-format
+            //This is valid up to year 2106
+            let nanos = self.time.subsec_nanos();
+            let seconds = (seconds as u32).to_be_bytes();
+            let nanos = nanos.to_be_bytes();
+            let time = [seconds[0], seconds[1], seconds[2], seconds[3], nanos[0], nanos[1], nanos[2], nanos[3]];
+            let time = ExtType((0, Int8(time)));
+            seq.serialize_element(&time)?;
+        }
+        #[cfg(not(feature = "event_time"))]
+        {
+            seq.serialize_element(&seconds)?;
+        }
+
         seq.serialize_element(&self.entries)?;
         seq.end()
     }

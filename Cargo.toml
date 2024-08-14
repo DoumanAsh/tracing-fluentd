@@ -1,6 +1,6 @@
 [package]
 name = "tracing-fluentd"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Douman <douman@gmx.se>"]
 edition = "2018"
 description = "Enables forwarding of `tracing` events towards the `fluentd` server."
@@ -48,3 +48,7 @@ features = ["with-serde"]
 version = "0.3.8"
 default-features = false
 features = ["registry", "fmt"]
+
+[features]
+# Specifies to encode timestamp as EventTime instead of default unix timestamp
+event_time = []

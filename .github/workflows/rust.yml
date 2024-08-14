@@ -2,41 +2,23 @@ name: Rust
 
 on:
   push:
-    paths:
-      - '.github/workflows/rust.yml'
-      - 'src/**.rs'
-      - '**.toml'
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
     branches:
-      - master
+      - 'master'
   pull_request:
-    paths:
-      - '.github/workflows/rust.yml'
-      - 'src/**.rs'
-      - '**.toml'
-    branches:
-      - '**'
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v1
-
-    - name: Install Rust Unix
-      if: runner.os != 'Windows'
-      run: |
-        if rustup --version >/dev/null 2>&1; then
-            rustup update
-        else
-             curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable
-             echo ::add-path::$HOME/.cargo/bin
-        fi
-
-    - name: Rust version
-      run: |
-        cargo --version
-        rustc --version
-
-    - name: Test
-      run: cargo test
+  check:
+    if: github.event.pull_request.draft == false
+    uses: DoumanAsh/douman-ci/.github/workflows/rust.yml@master
+    with:
+      cargo-no-features: true
+      cargo-features: event_time
