@@ -19,10 +19,6 @@ version = "1"
 default-features = false
 features = ["alloc"]
 
-[dependencies.indexmap]
-version = "1"
-features = ["serde"]
-
 [dependencies.tracing-subscriber]
 version = "0.3.8"
 default-features = false

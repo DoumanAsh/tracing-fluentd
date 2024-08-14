@@ -4,17 +4,18 @@ use serde::ser::{Serialize, Serializer, SerializeTuple, SerializeMap};
 use std::time;
 use core::fmt;
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 #[repr(transparent)]
 ///HashMap object suitable for fluent record.
-pub struct Map(indexmap::IndexMap<Cow<'static, str>, Value>);
+pub struct Map(HashMap<Cow<'static, str>, Value>);
 
 impl Map {
     #[inline(always)]
     ///Creates new empty map.
     pub fn new() -> Self {
-        Self(indexmap::IndexMap::new())
+        Self(HashMap::new())
     }
 }
 
@@ -26,7 +27,7 @@ impl core::fmt::Debug for Map {
 }
 
 impl core::ops::Deref for Map {
-    type Target = indexmap::IndexMap<Cow<'static, str>, Value>;
+    type Target = HashMap<Cow<'static, str>, Value>;
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
