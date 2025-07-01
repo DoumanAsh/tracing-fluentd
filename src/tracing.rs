@@ -131,6 +131,11 @@ impl tracing_core::field::Visit for fluent::Map {
     }
 
     #[inline(always)]
+    fn record_f64(&mut self, field: &Field, value: f64) {
+        self.insert(field.name().into(), value.into());
+    }
+
+    #[inline(always)]
     fn record_bool(&mut self, field: &Field, value: bool) {
         self.insert(field.name().into(), value.into());
     }

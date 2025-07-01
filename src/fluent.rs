@@ -56,6 +56,8 @@ pub enum Value {
     Int(i64),
     ///Unsigned integer
     Uint(u64),
+    ///Float
+    Float(f64),
     ///String
     Str(&'static str),
     ///Owned string
@@ -94,6 +96,13 @@ impl From<u64> for Value {
     }
 }
 
+impl From<f64> for Value {
+    #[inline(always)]
+    fn from(val: f64) -> Self {
+        Self::Float(val)
+    }
+}
+
 impl From<&'static str> for Value {
     #[inline(always)]
     fn from(val: &'static str) -> Self {
@@ -129,6 +138,7 @@ impl fmt::Debug for Value {
             Value::Bool(val) => fmt::Display::fmt(val, fmt),
             Value::Int(val) => fmt::Display::fmt(val, fmt),
             Value::Uint(val) => fmt::Display::fmt(val, fmt),
+            Value::Float(val) => fmt::Display::fmt(val, fmt),
             Value::EventLevel(val) => fmt::Debug::fmt(val, fmt),
             Value::Str(val) => fmt::Debug::fmt(val, fmt),
             Value::String(val) => fmt::Debug::fmt(val, fmt),
@@ -250,6 +260,7 @@ impl Serialize for Value {
             Value::Bool(val) => ser.serialize_bool(*val),
             Value::Int(val) => ser.serialize_i64(*val),
             Value::Uint(val) => ser.serialize_u64(*val),
+            Value::Float(val) => ser.serialize_f64(*val),
             Value::EventLevel(val) => ser.serialize_str(tracing_level_to_str(*val)),
             Value::Str(val) => ser.serialize_str(val),
             Value::String(val) => ser.serialize_str(val),
